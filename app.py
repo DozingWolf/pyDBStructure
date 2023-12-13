@@ -1,7 +1,9 @@
 # coding=utf-8
 # @Author  : Edmond
 
+from pathlib import Path
 from configparser import ConfigParser
+from traceback import format_exc
 from loguru import logger
 from getTableStructure import getSqlserverTableStructure,getOracleTableStructure
 from makeDoucmentFile import createExcel
@@ -12,41 +14,68 @@ from Error import AppError
 def main():
     # get parase
     try:
+        absPath = Path(__file__)
         conf = ConfigParser()
         conf.read('db.ini',encoding='utf-8')
         logFile = conf.get('log','path')
-        logger.add(logFile, rotation='00:00',compression='zip',level='WARNING')
+        logFilePath = absPath.parent / Path(logFile).parent
+        if logFilePath.exists():
+            logger.debug('log path {filepath} is exists', filepath = str(logFilePath))
+            logger.add(logFile, rotation='00:00',compression='zip',level='DEBUG')
+        else:
+            logger.debug(str(logFilePath))
+            logFilePath.mkdir(parents=True)
+
+        outputPath = conf.get('output','path')
+        absOutputPath = absPath.parent / outputPath
+        if absOutputPath.exists():
+            logger.debug('output path {filepath} is exists',filepath = str(absOutputPath))
+        else:
+            absOutputPath.mkdir(parents=True)
         dbType = conf.get('DB','type')
     except Exception as err:
-        logger.error(err)
+        logger.error(format_exc())
         messagebox.showerror(title='Error Message',message=err)
         return 0
     # get db structure
-    try:
-        if dbType == 'MSSQL':
+    if dbType == 'MSSQL':
+        try:
             rtn = getSqlserverTableStructure(serverIP=conf.get('DB','ip'),
                                             serverPort=conf.get('DB','port'),
                                             dbUser=conf.get('DB','user'),
                                             dbPasswd=conf.get('DB','pw'),
                                             dbName=conf.get('DB','ms_dbname'))
-        elif dbType == 'ORACLE':
-            rtn = getOracleTableStructure(dbIP=conf.get('DB','ip'),
-                                          dbPort=conf.get('DB','port'),
-                                          dbUser=conf.get('DB','user'),
-                                          dbPasswd=conf.get('DB','pw'),
-                                          dbServicename=conf.get('DB','orcl_servicename'))
-        elif dbType == 'MYSQL':
-            raise AppError(errcode='E000',errinfo='Dont worry, this model was empty~')
-        elif dbType == 'PG':
-            raise AppError(errcode='E000',errinfo='Dont worry, this model was empty~')
+        except Exception as err:
+            logger.error(err)
+            messagebox.showerror(title='Error Message',message=err)
+            raise err
         else:
-            raise AppError(errcode='E999',errinfo='Error db type %s'%dbType)
-    except Exception as err:
-        logger.error(err)
-        messagebox.showerror(title='Error Message',message=err)
-        return 0
+            logger.debug('GET MSSQL DB STRUCTURE DATA SUCCESS!')
+        
+    elif dbType == 'ORACLE':
+        try:
+            rtn = getOracleTableStructure(dbIP=conf.get('DB','ip'),
+                                        dbPort=conf.get('DB','port'),
+                                        dbUser=conf.get('DB','user'),
+                                        dbPasswd=conf.get('DB','pw'),
+                                        dbServicename=conf.get('DB','orcl_servicename'))
+        except Exception as err:
+            logger.error('THIS IS AN ERROR!')
+            logger.error(err)
+            logger.error(format_exc())
+            messagebox.showerror(title='Error Message',message=err)
+            return 0
+        else:
+            logger.debug('GET ORACLE DB STRUCTURE DATA SUCCESS!')
+
+    elif dbType == 'MYSQL':
+        raise AppError(errcode='E000',errinfo='Dont worry, this model was empty~')
+    elif dbType == 'PG':
+        raise AppError(errcode='E000',errinfo='Dont worry, this model was empty~')
     else:
-        logger.debug('GET DB STRUCTURE DATA SUCCESS!')
+        messagebox.showwarning(title='Warning',message='Error db type %s'%dbType)
+        raise AppError(errcode='E999',errinfo='Error db type %s'%dbType)
+    
     # build document
     try:
         createExcel(dbtype=dbType,dataset=rtn,path=conf.get('output','path'),filename=conf.get('output','filename'))

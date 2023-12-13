@@ -3,7 +3,9 @@
 
 import pyodbc
 import oracledb
+from oracledb.exceptions import DatabaseError as OrclDatabaseError
 from loguru import logger
+from traceback import format_exc
 
 @logger.catch
 def getSqlserverTableStructure(serverIP,serverPort,dbUser,dbPasswd,dbName):
@@ -82,88 +84,96 @@ def getOracleTableStructure(dbIP,dbPort,dbUser,dbPasswd,dbServicename):
     #         tabledesc:xxxxxx
     #     }
     # ]
-    oracledb.init_oracle_client()
-    conn = oracledb.connect(host=dbIP,port=dbPort,user=dbUser,password=dbPasswd,service_name=dbServicename)
-    cur = conn.cursor()
+    try:
+        oracledb.init_oracle_client()
+        conn = oracledb.connect(host=dbIP,port=dbPort,user=dbUser,password=dbPasswd,service_name=dbServicename)
+        cur = conn.cursor()
 
-    getOrclTableNameListSql = '''select table_name , comments from user_tab_comments where table_type = 'TABLE' '''
-    cur.execute(getOrclTableNameListSql)
-    tableNameRtn = cur.fetchall()
-    # logger.debug(tableNameRtn)
-    tableStructureList = []
-    for idx,tableData in enumerate(tableNameRtn):
-        tableDesc = tableData[1]
-        logger.debug(tableData[0])
-        getTableColumnsDescSql = '''
-        select 
-        COLUMN_ID, ta.COLUMN_NAME, trim(ta.COMMENTS) as COMMENTS, ta.IsIdentity, tb.CONSTRAINT_TYPE, 
-        DATA_TYPE, DATA_LENGTH, DATA_PRECISION, DATA_SCALE, NULLABLE, data_default
-        from 
-        (
+        getOrclTableNameListSql = '''select table_name , comments from user_tab_comments where table_type = 'TABLE' '''
+        cur.execute(getOrclTableNameListSql)
+        tableNameRtn = cur.fetchall()
+        # logger.debug(tableNameRtn)
+        tableStructureList = []
+        for idx,tableData in enumerate(tableNameRtn):
+            tableDesc = tableData[1]
+            logger.debug(tableData[0])
+            getTableColumnsDescSql = '''
             select 
-            tc.COLUMN_ID, tc.COLUMN_NAME, tc.TABLE_NAME,cc.COMMENTS,'' as IsIdentity,
-            tc.DATA_TYPE, tc.DATA_LENGTH, tc.DATA_PRECISION, tc.DATA_SCALE, tc.NULLABLE,
-            tc.data_default
-            from user_tab_cols tc 
-            inner join user_col_comments cc on tc.TABLE_NAME = cc.table_name 
-                    and tc.COLUMN_NAME = cc.column_name
-            where 1=1
-            and tc.TABLE_NAME = :table_name
-        ) Ta
-        left join 
-        (
-            select coc.CONSTRAINT_NAME, coc.TABLE_NAME, coc.COLUMN_NAME, con.CONSTRAINT_TYPE
+            COLUMN_ID, ta.COLUMN_NAME, trim(ta.COMMENTS) as COMMENTS, ta.IsIdentity, tb.CONSTRAINT_TYPE, 
+            DATA_TYPE, DATA_LENGTH, DATA_PRECISION, DATA_SCALE, NULLABLE, data_default
+            from 
+            (
+                select 
+                tc.COLUMN_ID, tc.COLUMN_NAME, tc.TABLE_NAME,cc.COMMENTS,'' as IsIdentity,
+                tc.DATA_TYPE, tc.DATA_LENGTH, tc.DATA_PRECISION, tc.DATA_SCALE, tc.NULLABLE,
+                tc.data_default
+                from user_tab_cols tc 
+                inner join user_col_comments cc on tc.TABLE_NAME = cc.table_name 
+                        and tc.COLUMN_NAME = cc.column_name
+                where 1=1
+                and tc.TABLE_NAME = :table_name
+            ) Ta
+            left join 
+            (
+                select coc.CONSTRAINT_NAME, coc.TABLE_NAME, coc.COLUMN_NAME, con.CONSTRAINT_TYPE
+                from user_cons_columns coc 
+                inner join user_constraints con on coc.TABLE_NAME = con.table_name 
+                        and coc.constraint_name = con.constraint_name 
+                        and con.constraint_type = 'P'
+                where 1=1
+                and coc.table_name = :table_name
+            ) Tb
+            on ta.table_name = tb.table_name and ta.column_name = tb.column_name
+            order by COLUMN_ID asc
+            '''
+            getTableColumnsConstraintsSql = '''
+            select coc.CONSTRAINT_NAME, coc.COLUMN_NAME, con.CONSTRAINT_TYPE
             from user_cons_columns coc 
             inner join user_constraints con on coc.TABLE_NAME = con.table_name 
-                    and coc.constraint_name = con.constraint_name 
-                    and con.constraint_type = 'P'
+                and coc.constraint_name = con.constraint_name 
+                and con.constraint_type <> 'P'
             where 1=1
             and coc.table_name = :table_name
-        ) Tb
-        on ta.table_name = tb.table_name and ta.column_name = tb.column_name
-        order by COLUMN_ID asc
-        '''
-        getTableColumnsConstraintsSql = '''
-        select coc.CONSTRAINT_NAME, coc.COLUMN_NAME, con.CONSTRAINT_TYPE
-        from user_cons_columns coc 
-        inner join user_constraints con on coc.TABLE_NAME = con.table_name 
-            and coc.constraint_name = con.constraint_name 
-            and con.constraint_type <> 'P'
-        where 1=1
-        and coc.table_name = :table_name
-        '''
-        getTableColumnsIndexSql = '''
-        select 
-        INDEX_NAME, INDEX_TYPE, UNIQUENESS, COMPRESSION 
-        from user_indexes ta
-        where 1=1
-        and ta.table_name = :table_name
-        '''
-        
-        # get table structure
-        cur.execute(getTableColumnsDescSql,table_name = tableData[0])
-        tableStruRtn = cur.fetchall()
-        logger.debug(tableStruRtn)
+            '''
+            getTableColumnsIndexSql = '''
+            select 
+            INDEX_NAME, INDEX_TYPE, UNIQUENESS, COMPRESSION 
+            from user_indexes ta
+            where 1=1
+            and ta.table_name = :table_name
+            '''
+            
+            # get table structure
+            cur.execute(getTableColumnsDescSql,table_name = tableData[0])
+            tableStruRtn = cur.fetchall()
+            logger.debug(tableStruRtn)
 
-        # get table columns constraint
-        cur.execute(getTableColumnsConstraintsSql,table_name = tableData[0])
-        tableColumnsConstRtn = cur.fetchall()
-        logger.debug(tableColumnsConstRtn)
+            # get table columns constraint
+            cur.execute(getTableColumnsConstraintsSql,table_name = tableData[0])
+            tableColumnsConstRtn = cur.fetchall()
+            logger.debug(tableColumnsConstRtn)
 
-        # get table columns index
-        cur.execute(getTableColumnsIndexSql,table_name = tableData[0])
-        tableColIndexRtn = cur.fetchall()
-        logger.debug(tableColIndexRtn)
+            # get table columns index
+            cur.execute(getTableColumnsIndexSql,table_name = tableData[0])
+            tableColIndexRtn = cur.fetchall()
+            logger.debug(tableColIndexRtn)
 
-        # build json structure
-        tableStructureList.append({'id' : idx ,
-                                   'TableName' : tableData[0] , 
-                                   'TableDesc' : tableDesc, 
-                                   'TableStructureData' : tableStruRtn,
-                                   'TableConstraint' : tableColumnsConstRtn,
-                                   'TableColumnIndex' : tableColIndexRtn})
-    logger.debug(tableStructureList)
-    cur.close()
-    conn.close()
-    return(tableStructureList)
+            # build json structure
+            tableStructureList.append({'id' : idx ,
+                                    'TableName' : tableData[0] , 
+                                    'TableDesc' : tableDesc, 
+                                    'TableStructureData' : tableStruRtn,
+                                    'TableConstraint' : tableColumnsConstRtn,
+                                    'TableColumnIndex' : tableColIndexRtn})
+        logger.debug(tableStructureList)
+        return(tableStructureList)
+    except OrclDatabaseError as err:
+        logger.error(format_exc())
+        raise err
+    except Exception as err:
+        logger.error(format_exc())
+        raise err
+    finally:
+        cur.close()
+        conn.close()
 
