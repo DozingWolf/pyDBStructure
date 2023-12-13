@@ -5,8 +5,6 @@ from pathlib import Path
 from configparser import ConfigParser
 from traceback import format_exc
 from loguru import logger
-from oracledb.exceptions import DatabaseError as OrclDatabaseError
-from getTableStructure import getSqlserverTableStructure,getOracleTableStructure
 from makeDoucmentFile import createExcel
 from tkinter import messagebox
 from Error import AppError
@@ -40,6 +38,7 @@ def main():
         return 0
     # get db structure
     if dbType == 'MSSQL':
+        from getTableStructure import getSqlserverTableStructure
         try:
             rtn = getSqlserverTableStructure(serverIP=conf.get('DB','ip'),
                                             serverPort=conf.get('DB','port'),
@@ -54,6 +53,8 @@ def main():
             logger.debug('GET MSSQL DB STRUCTURE DATA SUCCESS!')
         
     elif dbType == 'ORACLE':
+        from getTableStructure import getOracleTableStructure
+        from oracledb.exceptions import DatabaseError as OrclDatabaseError
         try:
             rtn = getOracleTableStructure(dbIP=conf.get('DB','ip'),
                                         dbPort=conf.get('DB','port'),

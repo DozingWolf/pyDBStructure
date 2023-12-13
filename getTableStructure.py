@@ -1,14 +1,12 @@
 # coding=utf-8
 # @Author  : Edmond
 
-import pyodbc
-import oracledb
-from oracledb.exceptions import DatabaseError as OrclDatabaseError
 from loguru import logger
 from traceback import format_exc
 
 #@logger.catch
 def getSqlserverTableStructure(serverIP,serverPort,dbUser,dbPasswd,dbName):
+    import pyodbc
 
     connectionString='DRIVER={ODBC Driver 17 for SQL Server};SERVER=%s;DATABASE=%s;UID=%s;PWD=%s'%(serverIP,dbName,dbUser,dbPasswd)
 
@@ -71,6 +69,10 @@ def getSqlserverTableStructure(serverIP,serverPort,dbUser,dbPasswd,dbName):
 
 #@logger.catch
 def getOracleTableStructure(dbIP,dbPort,dbUser,dbPasswd,dbServicename):
+
+    import oracledb
+    from oracledb.exceptions import DatabaseError as OrclDatabaseError
+    
     # conn = oracledb.connect(host=dbIP,port=dbPort,user=dbUser,password=dbPasswd,service_name=dbServicename)
     # list structure demo
     # 
@@ -168,8 +170,18 @@ def getOracleTableStructure(dbIP,dbPort,dbUser,dbPasswd,dbServicename):
         logger.debug(tableStructureList)
         return(tableStructureList)
     except OrclDatabaseError as err:
-        cur.close()
-        conn.close()
+        try:
+            cur
+        except NameError:
+            pass
+        else:
+            cur.close()
+        try:
+            conn
+        except NameError:
+            pass
+        else:
+            conn.close()
         raise err
     except Exception as err:
         cur.close()
