@@ -7,7 +7,7 @@ from oracledb.exceptions import DatabaseError as OrclDatabaseError
 from loguru import logger
 from traceback import format_exc
 
-@logger.catch
+#@logger.catch
 def getSqlserverTableStructure(serverIP,serverPort,dbUser,dbPasswd,dbName):
 
     connectionString='DRIVER={ODBC Driver 17 for SQL Server};SERVER=%s;DATABASE=%s;UID=%s;PWD=%s'%(serverIP,dbName,dbUser,dbPasswd)
@@ -69,7 +69,7 @@ def getSqlserverTableStructure(serverIP,serverPort,dbUser,dbPasswd,dbName):
     conn.close()
     return tableStructureList
 
-@logger.catch
+#@logger.catch
 def getOracleTableStructure(dbIP,dbPort,dbUser,dbPasswd,dbServicename):
     # conn = oracledb.connect(host=dbIP,port=dbPort,user=dbUser,password=dbPasswd,service_name=dbServicename)
     # list structure demo
@@ -168,12 +168,15 @@ def getOracleTableStructure(dbIP,dbPort,dbUser,dbPasswd,dbServicename):
         logger.debug(tableStructureList)
         return(tableStructureList)
     except OrclDatabaseError as err:
-        logger.error(format_exc())
-        raise err
-    except Exception as err:
-        logger.error(format_exc())
-        raise err
-    finally:
         cur.close()
         conn.close()
+        raise err
+    except Exception as err:
+        cur.close()
+        conn.close()
+        raise err
+    else:
+        cur.close()
+        conn.close()
+        
 

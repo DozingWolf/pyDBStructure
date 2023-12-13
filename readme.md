@@ -58,3 +58,4 @@ Microsoft ODBC Drive 18 for SQL Server (x64)
 1. 比较丑，哈哈
 2. 因为我不熟MSSQL，所以MSSQL的约束和索引不知道怎么写查询SQL，留给后人了
 3. 有些拆包封包的循环可能比较冗余，有兴趣的同学可以优化下
+4. 发现一个很奇怪的问题，如果在调用数据库模块的函数前面使用loguru的捕获装饰器@logger.catch会造成在外层无法捕获到正确的exception……暂时只在python-oracledb这个包的调用时发现这个问题，不知道pyodbc或者pymysql会不会有一样的情况，抽空要试一下

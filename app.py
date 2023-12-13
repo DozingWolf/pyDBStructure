@@ -5,6 +5,7 @@ from pathlib import Path
 from configparser import ConfigParser
 from traceback import format_exc
 from loguru import logger
+from oracledb.exceptions import DatabaseError as OrclDatabaseError
 from getTableStructure import getSqlserverTableStructure,getOracleTableStructure
 from makeDoucmentFile import createExcel
 from tkinter import messagebox
@@ -59,6 +60,12 @@ def main():
                                         dbUser=conf.get('DB','user'),
                                         dbPasswd=conf.get('DB','pw'),
                                         dbServicename=conf.get('DB','orcl_servicename'))
+        except OrclDatabaseError as err:
+            logger.error('THIS IS AN OrclDatabaseError ERROR!')
+            logger.error(err)
+            logger.error(format_exc())
+            messagebox.showerror(title='Error Message',message=err)
+            return 0
         except Exception as err:
             logger.error('THIS IS AN ERROR!')
             logger.error(err)
@@ -81,6 +88,7 @@ def main():
         createExcel(dbtype=dbType,dataset=rtn,path=conf.get('output','path'),filename=conf.get('output','filename'))
     except Exception as err:
         logger.error(err)
+        logger.error(format_exc())
         messagebox.showerror(title='Error Message',message=err)
         return 0
     else:
