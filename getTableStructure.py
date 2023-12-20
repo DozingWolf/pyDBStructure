@@ -60,7 +60,11 @@ def getSqlserverTableStructure(serverIP,serverPort,dbUser,dbPasswd,dbName):
         cur.execute(getTableColumnsDescSql,exeTableName)
         tableStructure = cur.fetchall()
         # logger.debug(tableStructure)
-        tableStructureList.append({'id' : id , 'TableName' : exeTableName , 'TableStructureData' : tableStructure})
+        tableStructureList.append({'id' : id , 
+                                   'TableName' : exeTableName , 
+                                   'TableStructureData' : tableStructure ,
+                                   'TableConstraint' : '',
+                                   'TableColumnIndex' : ''})
 
     # logger.debug(tableStructureList)
     cur.close()
